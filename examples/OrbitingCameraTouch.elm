@@ -1,4 +1,4 @@
-module OrbitingCamera exposing (main)
+module OrbitingCameraTouch exposing (main)
 
 {-| This example shows how you can allow orbiting of a scene by listening for
 mouse events and moving the camera accordingly.
@@ -10,6 +10,7 @@ import Browser
 import Browser.Events
 import Color
 import Html
+import Html.Events
 import Html.Events.Extra.Wheel as Wheel
 import Http
 import Json.Decode as Decode exposing (Decoder)
@@ -202,31 +203,32 @@ toModifierKey string =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    -- If we're currently orbiting, listen for mouse moves and mouse button
-    -- up events (to stop orbiting); in a real app we'd probably also want
-    -- to listen for page visibility changes to stop orbiting if the user
-    -- switches to a different tab or something
-    let
-        upAndDownListeners =
-            [ Browser.Events.onMouseDown (Decode.map MouseDown decodeMousePos)
-            , Browser.Events.onMouseUp (Decode.succeed MouseUp)
-            , Browser.Events.onKeyDown (Decode.map KeyDown keyDecoder)
-            , Browser.Events.onKeyUp (Decode.map KeyUp keyDecoder)
-            ]
-
-        mouseMoveListener =
-            Browser.Events.onMouseMove (Decode.map MouseMove decodeMousePos)
-    in
-    if model.orbitControlState /= OrbitIdle then
-        Sub.batch (mouseMoveListener :: upAndDownListeners)
-
-    else
-        Sub.batch upAndDownListeners
+subscriptions _ =
+    Sub.batch
+        [ Browser.Events.onKeyDown (Decode.map KeyDown keyDecoder)
+        , Browser.Events.onKeyUp (Decode.map KeyUp keyDecoder)
+        ]
 
 
 view : Model -> Browser.Document Msg
 view model =
+    let
+        commonListeners =
+            [ Wheel.onWheel chooseZoom
+            , Html.Events.preventDefaultOn "pointerdown" (Decode.map (\e -> ( MouseDown e, True )) decodeMousePos)
+            , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( MouseUp, True ))
+            ]
+
+        mouseMoveListener =
+            Html.Events.preventDefaultOn "pointermove" (Decode.map (\e -> ( MouseMove e, True )) decodeMousePos)
+
+        allListeners =
+            if model.orbitControlState == OrbitIdle then
+                commonListeners
+
+            else
+                mouseMoveListener :: commonListeners
+    in
     { title = "OrbitingCamera"
     , body =
         [ Scene3d.cloudy
@@ -243,7 +245,7 @@ view model =
                 ]
             }
             |> List.singleton
-            |> Html.div [ Wheel.onWheel chooseZoom ]
+            |> Html.div allListeners
         , Html.div [] [ Html.text "Click and drag to rotate" ]
         , Html.div [] [ Html.text "Hold [CTRL] to pan instead of rotate" ]
         , Html.div [] [ Html.text "Use the mouse wheel to zoom in and out" ]
