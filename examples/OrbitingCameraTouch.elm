@@ -7,6 +7,7 @@ mouse events and moving the camera accordingly.
 import Angle
 import Axis3d
 import Browser
+import Browser.Dom
 import Browser.Events
 import Color
 import Html
@@ -25,6 +26,7 @@ import Scene3d
 import Scene3d.Material as Material
 import Scene3d.Mesh as Mesh exposing (Mesh)
 import SketchPlane3d
+import Task
 import TriangularMesh exposing (TriangularMesh)
 
 
@@ -48,6 +50,7 @@ loadMesh =
 
 type Msg
     = GotMesh (Result Http.Error (TriangularMesh (Point3d Meters ObjCoordinates)))
+    | WindowResize Float Float
     | MouseDown ( Quantity Float Pixels, Quantity Float Pixels )
     | MouseMove ( Quantity Float Pixels, Quantity Float Pixels )
     | MouseUp
@@ -84,7 +87,11 @@ init () =
             , camera = OrbitCamera.init Point3d.origin (Length.meters 5)
             }
       }
-    , loadMesh
+    , Cmd.batch
+        [ loadMesh
+        , Browser.Dom.getViewport
+            |> Task.perform (\vp -> WindowResize vp.viewport.width vp.viewport.height)
+        ]
     )
 
 
@@ -101,6 +108,15 @@ update message model =
                     Debug.log "OBJ decoder error:" err
             in
             ( model, Cmd.none )
+
+        -- Update the viewer when the window is resized
+        ( WindowResize width height, _ ) ->
+            ( { model
+                | orbitViewer =
+                    OrbitViewer.resize ( Pixels.float width, Pixels.float height ) model.orbitViewer
+              }
+            , Cmd.none
+            )
 
         -- Record the fact that modifier keys, such as CTRL, are pressed down
         ( KeyDown key, _ ) ->
@@ -207,6 +223,7 @@ subscriptions _ =
     Sub.batch
         [ Browser.Events.onKeyDown (Decode.map KeyDown keyDecoder)
         , Browser.Events.onKeyUp (Decode.map KeyUp keyDecoder)
+        , Browser.Events.onResize (\w h -> WindowResize (toFloat w) (toFloat h))
         ]
 
 
@@ -246,8 +263,5 @@ view model =
             }
             |> List.singleton
             |> Html.div allListeners
-        , Html.div [] [ Html.text "Click and drag to rotate" ]
-        , Html.div [] [ Html.text "Hold [CTRL] to pan instead of rotate" ]
-        , Html.div [] [ Html.text "Use the mouse wheel to zoom in and out" ]
         ]
     }
