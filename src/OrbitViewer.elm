@@ -3,7 +3,7 @@ module OrbitViewer exposing (..)
 {-| A 3D viewer with helper functions for navigation control.
 -}
 
-import Angle exposing (Angle, Radians)
+import Angle exposing (Radians)
 import OrbitCamera exposing (OrbitCamera)
 import Pixels exposing (Pixels)
 import Quantity exposing (Quantity, Rate)
@@ -132,9 +132,20 @@ This function is useful to zoom on a specific point in the viewer.
 
 -}
 zoomWithFixPoint : Float -> ( Quantity Float Pixels, Quantity Float Pixels ) -> OrbitViewer units coordinates -> OrbitViewer units coordinates
-zoomWithFixPoint zoomCoef fixPoint { size, camera } =
+zoomWithFixPoint zoomCoef ( x, y ) { size, camera } =
+    let
+        ( width, height ) =
+            size
+
+        -- x coordinate when (0,0) is at the center of the viewer
+        cx =
+            Quantity.difference x (Quantity.half width)
+
+        cy =
+            Quantity.difference y (Quantity.half height)
+    in
     { size = size
-    , camera = OrbitCamera.zoomWithFixPoint zoomCoef { fixPoint = fixPoint, canvasHeight = Tuple.second size } camera
+    , camera = OrbitCamera.zoomWithFixPoint zoomCoef { fixPoint = ( cx, cy ), canvasHeight = Tuple.second size } camera
     }
 
 

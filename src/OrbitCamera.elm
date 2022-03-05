@@ -214,9 +214,9 @@ Let x\_p be the x pixel coordinate of that cursor, with (0,0) being the screen c
 We want to zoom, and keep the thing at x\_p at a fix position.
 Let f be the focal length of the camera.
 
-Let x1 be the real world coordinates (in the frame of the camera)
+Let x1 be the world coordinates (in the frame of the camera)
 of the thing we observe at a distance d1 of the camera corresponding to x\_p.
-Let x2 be the real world coordinates (in the frame of the camera)
+Let x2 be the world coordinates (in the frame of the camera)
 of the same observed thing at a distance d2, after moving the camera to zoom in or out.
 
 If x\_p is expected to stay constant after zooming, we have the following relations (Thales):
@@ -234,11 +234,11 @@ we also have the relation:
 ```
 
 After zooming, to keep x\_p at the same position,
-we need to apply a translation delta\_x = x2 - x1 to the camera.
+we need to apply a translation delta\_x = x1 - x2 to the camera.
 According to (2), that translation to apply is:
 
 ```haskell
-(3)   delta_x = x1 * (alpha - 1)
+(3)   delta_x = x1 * (1 - alpha)
 ```
 
 To be able to know the value of x1, we can first compute the value of f.
@@ -265,7 +265,7 @@ And finally, by replacing x1 by the expression in (6), equation (3) gives us
 that the tranlation to apply delta\_x to keep x\_p at a fix point is the following:
 
 ```haskell
-(7)   delta_x = (alpha - 1) * d1 * x_p * (2 * tan( fov / 2 )) / canvasHeight
+(7)   delta_x = (1 - alpha) * d1 * x_p * (2 * tan( fov / 2 )) / canvasHeight
 ```
 
 -}
@@ -280,7 +280,7 @@ zoomWithFixPoint zoomCoef { fixPoint, canvasHeight } camera =
             camera.projection
 
         scaleCoef =
-            Quantity.multiplyBy ((zoomCoef - 1) * 2 * tan (Angle.inRadians fov / 2)) camera.distance
+            Quantity.multiplyBy ((1 - zoomCoef) * 2 * tan (Angle.inRadians fov / 2)) camera.distance
 
         ( x_p, y_p ) =
             fixPoint
@@ -290,6 +290,7 @@ zoomWithFixPoint zoomCoef { fixPoint, canvasHeight } camera =
 
         delta_y =
             Quantity.multiplyBy (Quantity.ratio y_p canvasHeight) scaleCoef
+                |> Quantity.negate
     in
     zoomBy zoomCoef camera
         |> viewPlaneTranslateBy (Vector2d.xy delta_x delta_y)

@@ -52,8 +52,8 @@ type Msg
     | MouseUp
     | KeyDown ModifierKey
     | KeyUp ModifierKey
-    | ZoomIn
-    | ZoomOut
+    | ZoomIn ( Quantity Float Pixels, Quantity Float Pixels )
+    | ZoomOut ( Quantity Float Pixels, Quantity Float Pixels )
 
 
 type ModifierKey
@@ -152,21 +152,28 @@ update message model =
             ( model, Cmd.none )
 
         -- Zooming in
-        ( ZoomIn, _ ) ->
-            ( { model | orbitViewer = OrbitViewer.zoomIn model.orbitViewer }, Cmd.none )
+        ( ZoomIn pos, _ ) ->
+            -- ( { model | orbitViewer = OrbitViewer.zoomIn model.orbitViewer }, Cmd.none )
+            ( { model | orbitViewer = OrbitViewer.zoomToward pos model.orbitViewer }, Cmd.none )
 
         -- Zooming out
-        ( ZoomOut, _ ) ->
-            ( { model | orbitViewer = OrbitViewer.zoomOut model.orbitViewer }, Cmd.none )
+        ( ZoomOut pos, _ ) ->
+            -- ( { model | orbitViewer = OrbitViewer.zoomOut model.orbitViewer }, Cmd.none )
+            ( { model | orbitViewer = OrbitViewer.zoomAwayFrom pos model.orbitViewer }, Cmd.none )
 
 
 chooseZoom : Wheel.Event -> Msg
 chooseZoom wheelEvent =
+    let
+        mousePosition =
+            wheelEvent.mouseEvent.clientPos
+                |> Tuple.mapBoth Pixels.pixels Pixels.pixels
+    in
     if wheelEvent.deltaY > 0 then
-        ZoomOut
+        ZoomOut mousePosition
 
     else
-        ZoomIn
+        ZoomIn mousePosition
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
