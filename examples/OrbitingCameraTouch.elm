@@ -10,6 +10,7 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Color
+import Element exposing (Element)
 import Html
 import Html.Events
 import Html.Events.Extra.Wheel as Wheel
@@ -229,6 +230,15 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
+    { title = "OrbitingCamera"
+    , body =
+        [ Element.layout [] (viewElmUi model)
+        ]
+    }
+
+
+viewElmUi : Model -> Element Msg
+viewElmUi model =
     let
         commonListeners =
             [ Wheel.onWheel chooseZoom
@@ -245,23 +255,23 @@ view model =
 
             else
                 mouseMoveListener :: commonListeners
+
+        scene3d =
+            Scene3d.cloudy
+                { camera = OrbitCamera.toCamera3d model.orbitViewer.camera
+                , upDirection = SketchPlane3d.normalDirection model.orbitViewer.camera.groundPlane
+                , clipDepth = Length.meters 0.01
+                , dimensions = Tuple.mapBoth Quantity.round Quantity.round model.orbitViewer.size
+                , background = Scene3d.backgroundColor Color.lightGrey
+                , entities =
+                    -- Draw the loaded OBJ mesh
+                    [ Scene3d.mesh (Material.matte Color.orange) model.mesh
+                        |> Scene3d.rotateAround Axis3d.x (Angle.degrees 90)
+                        |> Scene3d.rotateAround Axis3d.z (Angle.degrees 90)
+                    ]
+                }
+                |> List.singleton
+                |> Html.div allListeners
+                |> Element.html
     in
-    { title = "OrbitingCamera"
-    , body =
-        [ Scene3d.cloudy
-            { camera = OrbitCamera.toCamera3d model.orbitViewer.camera
-            , upDirection = SketchPlane3d.normalDirection model.orbitViewer.camera.groundPlane
-            , clipDepth = Length.meters 0.01
-            , dimensions = Tuple.mapBoth Quantity.round Quantity.round model.orbitViewer.size
-            , background = Scene3d.backgroundColor Color.lightGrey
-            , entities =
-                -- Draw the loaded OBJ mesh
-                [ Scene3d.mesh (Material.matte Color.orange) model.mesh
-                    |> Scene3d.rotateAround Axis3d.x (Angle.degrees 90)
-                    |> Scene3d.rotateAround Axis3d.z (Angle.degrees 90)
-                ]
-            }
-            |> List.singleton
-            |> Html.div allListeners
-        ]
-    }
+    scene3d

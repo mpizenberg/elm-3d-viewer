@@ -19,6 +19,7 @@
             "ianmackenzie/elm-geometry": "3.9.1",
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
             "ianmackenzie/elm-units": "2.9.0",
+            "mdgriffith/elm-ui": "1.1.8",
             "mpizenberg/elm-pointer-events": "4.0.2",
             "w0rm/elm-obj-file": "1.2.1"
         },
