@@ -291,18 +291,35 @@ viewControls model =
                 |> Element.html
                 |> Element.el [ Element.padding 8 ]
                 |> Element.el [ shadow, Element.Border.rounded 8, Element.Events.onClick msg ]
+
+        ( width, height ) =
+            model.orbitViewer.size
     in
-    Element.column
-        [ Element.Background.color (Element.rgba 0.3 0.3 0.3 0.85)
-        , Element.centerY
-        , Element.moveRight 32
-        , Element.Font.color (Element.rgb 1 1 1)
-        , Element.Border.rounded 8
-        ]
-        [ controlButton (model.controller == RotationControl) (SelectController RotationControl) Phosphor.planet
-        , controlButton (model.controller == PanControl) (SelectController PanControl) Phosphor.handGrabbing
-        , controlButton (model.controller == ZoomControl) (SelectController ZoomControl) Phosphor.magnifyingGlassPlus
-        ]
+    if width |> Quantity.greaterThan height then
+        Element.column
+            [ Element.Background.color (Element.rgba 0.3 0.3 0.3 0.85)
+            , Element.centerY
+            , Element.moveRight 32
+            , Element.Font.color (Element.rgb 1 1 1)
+            , Element.Border.rounded 8
+            ]
+            [ controlButton (model.controller == RotationControl) (SelectController RotationControl) Phosphor.planet
+            , controlButton (model.controller == PanControl) (SelectController PanControl) Phosphor.handGrabbing
+            , controlButton (model.controller == ZoomControl) (SelectController ZoomControl) Phosphor.magnifyingGlassPlus
+            ]
+
+    else
+        Element.row
+            [ Element.Background.color (Element.rgba 0.3 0.3 0.3 0.85)
+            , Element.centerX
+            , Element.moveDown 32
+            , Element.Font.color (Element.rgb 1 1 1)
+            , Element.Border.rounded 8
+            ]
+            [ controlButton (model.controller == RotationControl) (SelectController RotationControl) Phosphor.planet
+            , controlButton (model.controller == PanControl) (SelectController PanControl) Phosphor.handGrabbing
+            , controlButton (model.controller == ZoomControl) (SelectController ZoomControl) Phosphor.magnifyingGlassPlus
+            ]
 
 
 viewElmUi : Model -> Element Msg
