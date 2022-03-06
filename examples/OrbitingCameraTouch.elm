@@ -11,6 +11,9 @@ import Browser.Dom
 import Browser.Events
 import Color
 import Element exposing (Element)
+import Element.Background
+import Element.Border
+import Element.Font
 import Html
 import Html.Events
 import Html.Events.Extra.Wheel as Wheel
@@ -20,6 +23,7 @@ import Length exposing (Meters)
 import Obj.Decode exposing (ObjCoordinates)
 import OrbitCamera
 import OrbitViewer exposing (OrbitViewer)
+import Phosphor
 import Pixels exposing (Pixels)
 import Point3d exposing (Point3d)
 import Quantity exposing (Quantity)
@@ -232,9 +236,42 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "OrbitingCamera"
     , body =
-        [ Element.layout [] (viewElmUi model)
+        [ Element.layout [ Element.inFront (viewControls model) ] (viewElmUi model)
         ]
     }
+
+
+viewControls : Model -> Element Msg
+viewControls model =
+    let
+        controlButton selected icon =
+            let
+                shadow =
+                    if selected then
+                        Element.Border.glow (Element.rgb 0 0 0) 4
+
+                    else
+                        Element.Border.glow (Element.rgb 0 0 0) 0
+            in
+            icon Phosphor.Regular
+                |> Phosphor.withSize 48
+                |> Phosphor.withSizeUnit "px"
+                |> Phosphor.toHtml []
+                |> Element.html
+                |> Element.el [ Element.padding 8 ]
+                |> Element.el [ shadow, Element.Border.rounded 8 ]
+    in
+    Element.column
+        [ Element.Background.color (Element.rgba 0.3 0.3 0.3 0.85)
+        , Element.centerY
+        , Element.moveRight 32
+        , Element.Font.color (Element.rgb 1 1 1)
+        , Element.Border.rounded 8
+        ]
+        [ controlButton (model.ctrlKeyDown == False) Phosphor.planet
+        , controlButton (model.ctrlKeyDown == True) Phosphor.handGrabbing
+        , controlButton False Phosphor.magnifyingGlassPlus
+        ]
 
 
 viewElmUi : Model -> Element Msg
