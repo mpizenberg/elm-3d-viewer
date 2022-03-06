@@ -16,6 +16,7 @@ import Element.Border
 import Element.Events
 import Element.Font
 import Html
+import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Wheel as Wheel
 import Http
@@ -325,6 +326,7 @@ viewElmUi model =
             [ Wheel.onWheel chooseZoom
             , Html.Events.preventDefaultOn "pointerdown" (Decode.map (\e -> ( MouseDown e, True )) decodeMousePos)
             , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( MouseUp, True ))
+            , Html.Attributes.style "touch-action" "none"
             ]
 
         mouseMoveListener =
