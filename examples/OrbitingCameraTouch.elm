@@ -116,10 +116,6 @@ update message model =
             ( { model | mesh = Mesh.indexedFacets mesh }, Cmd.none )
 
         ( GotMesh (Err err), _ ) ->
-            let
-                _ =
-                    Debug.log "OBJ decoder error:" err
-            in
             ( model, Cmd.none )
 
         -- Update the viewer when the window is resized
