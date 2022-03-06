@@ -6,7 +6,7 @@ module OrbitViewer exposing (..)
 import Angle exposing (Radians)
 import OrbitCamera exposing (OrbitCamera)
 import Pixels exposing (Pixels)
-import Quantity exposing (Quantity, Rate)
+import Quantity exposing (Quantity, Rate, Unitless)
 import Vector2d
 
 
@@ -123,6 +123,36 @@ zoomOut : OrbitViewer units coordinates -> OrbitViewer units coordinates
 zoomOut { size, camera } =
     { size = size
     , camera = OrbitCamera.zoomOut camera
+    }
+
+
+{-| Zoom by changing the distance from the focal point.
+-}
+zoom :
+    Quantity Float (Rate Unitless Pixels)
+    -> Quantity Float Pixels
+    -> OrbitViewer units coordinates
+    -> OrbitViewer units coordinates
+zoom zoomSpeed dx { size, camera } =
+    let
+        -- We want that whatever the value of dx,
+        -- moving the pointer by dx, and then by -dx results in the same position.
+        -- If dx > 0, we want to zoom in, so we want zoomCoef < 1.
+        -- If dx < 0, we want to zoom out, so we want zoomCoef > 1.
+        -- One formula that can work is the following:
+        zoomCoef =
+            if Quantity.greaterThanZero dx then
+                (dx |> Quantity.at zoomSpeed)
+                    |> Quantity.toFloat
+                    |> (\x -> 1 / (1 + x))
+
+            else
+                (dx |> Quantity.at zoomSpeed)
+                    |> Quantity.toFloat
+                    |> (\x -> 1 - x)
+    in
+    { size = size
+    , camera = OrbitCamera.zoomBy zoomCoef camera
     }
 
 
