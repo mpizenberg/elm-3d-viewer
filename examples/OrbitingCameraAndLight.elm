@@ -71,7 +71,7 @@ type Msg
     | MouseUp
     | KeyDown ModifierKey
     | KeyUp ModifierKey
-    | LightDown Bool
+    | LightDown (Maybe ( Quantity Float Pixels, Quantity Float Pixels ))
     | LightMoves ( Quantity Float Pixels, Quantity Float Pixels )
     | ZoomIn ( Quantity Float Pixels, Quantity Float Pixels )
     | ZoomOut ( Quantity Float Pixels, Quantity Float Pixels )
@@ -100,7 +100,7 @@ type alias Model =
     , lightDirection : Direction3d ObjCoordinates
     , lightSphere : Scene3d.Entity ObjCoordinates
     , lightOrbitViewer : OrbitViewer Meters ObjCoordinates
-    , lightPointerDown : Bool
+    , lightPointerDown : Maybe ( Quantity Float Pixels, Quantity Float Pixels )
     }
 
 
@@ -113,7 +113,7 @@ init () =
             { size = ( Pixels.pixels 800, Pixels.pixels 400 )
             , camera = OrbitCamera.init Point3d.origin (Length.meters 5)
             }
-      , lightPointerDown = False
+      , lightPointerDown = Nothing
       , lightDirection = Direction3d.negativeZ
       , lightSphere =
             Scene3d.sphere
@@ -134,16 +134,16 @@ init () =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
-    case ( message, model.pointerState ) of
+    case ( message, model.pointerState, model.lightPointerDown ) of
         -- Create a triangular mesh from the loaded OBJ file
-        ( GotMesh (Ok mesh), _ ) ->
+        ( GotMesh (Ok mesh), _, _ ) ->
             ( { model | mesh = Mesh.indexedFacets mesh }, Cmd.none )
 
-        ( GotMesh (Err _), _ ) ->
+        ( GotMesh (Err _), _, _ ) ->
             ( model, Cmd.none )
 
         -- Update the viewer when the window is resized
-        ( WindowResize width height, _ ) ->
+        ( WindowResize width height, _, _ ) ->
             ( { model
                 | orbitViewer =
                     OrbitViewer.resize ( Pixels.float width, Pixels.float height ) model.orbitViewer
@@ -152,11 +152,11 @@ update message model =
             )
 
         -- Select the controller to use when the pointer moves
-        ( SelectController controller, _ ) ->
+        ( SelectController controller, _, _ ) ->
             ( { model | controller = controller }, Cmd.none )
 
         -- Record the fact that modifier keys, such as CTRL, are pressed down
-        ( KeyDown key, _ ) ->
+        ( KeyDown key, _, _ ) ->
             case ( key, model.controller ) of
                 ( ControlKey, RotationControl ) ->
                     ( { model | controller = PanControl }, Cmd.none )
@@ -167,7 +167,7 @@ update message model =
                 _ ->
                     ( model, Cmd.none )
 
-        ( KeyUp key, _ ) ->
+        ( KeyUp key, _, _ ) ->
             case ( key, model.controller ) of
                 ( ControlKey, RotationControl ) ->
                     ( { model | controller = PanControl }, Cmd.none )
@@ -179,15 +179,15 @@ update message model =
                     ( model, Cmd.none )
 
         -- Start orbiting when a mouse button is pressed
-        ( MouseDown pos, _ ) ->
+        ( MouseDown pos, _, _ ) ->
             ( { model | pointerState = PointerMoving pos }, Cmd.none )
 
         -- Stop orbiting when a mouse button is released
-        ( MouseUp, _ ) ->
+        ( MouseUp, _, _ ) ->
             ( { model | pointerState = PointerIdle }, Cmd.none )
 
         -- Orbit camera on mouse move
-        ( MouseMove ( x2, y2 ), PointerMoving ( x1, y1 ) ) ->
+        ( MouseMove ( x2, y2 ), PointerMoving ( x1, y1 ), _ ) ->
             let
                 dx =
                     Quantity.difference x2 x1
@@ -224,11 +224,20 @@ update message model =
             , Cmd.none
             )
 
-        ( MouseMove _, _ ) ->
+        ( MouseMove _, PointerIdle, _ ) ->
             ( model, Cmd.none )
 
-        ( LightMoves ( dx, dy ), _ ) ->
+        ( LightMoves _, _, Nothing ) ->
+            ( model, Cmd.none )
+
+        ( LightMoves ( x2, y2 ), _, Just ( x1, y1 ) ) ->
             let
+                dx =
+                    Quantity.difference x2 x1
+
+                dy =
+                    Quantity.difference y2 y1
+
                 -- View frame moved to the origin to only account for rotations
                 viewFrameOrigin =
                     OrbitCamera.toCamera3d model.lightOrbitViewer.camera
@@ -263,19 +272,19 @@ update message model =
                 updatedLightDirection =
                     Direction3d.rotateAround rotationAxisGlobal rotationMagnitude model.lightDirection
             in
-            ( { model | lightDirection = updatedLightDirection }, Cmd.none )
+            ( { model | lightDirection = updatedLightDirection, lightPointerDown = Just ( x2, y2 ) }, Cmd.none )
 
         -- Record the current start/stop interaction with the light direction
-        ( LightDown lightPointerIsDown, _ ) ->
+        ( LightDown lightPointerIsDown, _, _ ) ->
             ( { model | lightPointerDown = lightPointerIsDown }, Cmd.none )
 
         -- Zooming in
-        ( ZoomIn pos, _ ) ->
+        ( ZoomIn pos, _, _ ) ->
             -- ( { model | orbitViewer = OrbitViewer.zoomIn model.orbitViewer }, Cmd.none )
             ( { model | orbitViewer = OrbitViewer.zoomToward pos model.orbitViewer }, Cmd.none )
 
         -- Zooming out
-        ( ZoomOut pos, _ ) ->
+        ( ZoomOut pos, _, _ ) ->
             -- ( { model | orbitViewer = OrbitViewer.zoomOut model.orbitViewer }, Cmd.none )
             ( { model | orbitViewer = OrbitViewer.zoomAwayFrom pos model.orbitViewer }, Cmd.none )
 
@@ -302,16 +311,6 @@ decodeMousePos =
     Decode.map2 Tuple.pair
         (Decode.field "clientX" (Decode.map Pixels.float Decode.float))
         (Decode.field "clientY" (Decode.map Pixels.float Decode.float))
-
-
-{-| Use movementX and movementY for simplicity (don't need to store initial
-mouse position in the model) - not supported in Internet Explorer though
--}
-decodeMouseMove : Decoder ( Quantity Float Pixels, Quantity Float Pixels )
-decodeMouseMove =
-    Decode.map2 Tuple.pair
-        (Decode.field "movementX" (Decode.map Pixels.float Decode.float))
-        (Decode.field "movementY" (Decode.map Pixels.float Decode.float))
 
 
 keyDecoder : Decoder ModifierKey
@@ -448,20 +447,21 @@ viewLight : Model -> Element Msg
 viewLight model =
     let
         commonListeners =
-            [ Html.Events.preventDefaultOn "pointerdown" (Decode.succeed ( LightDown True, True ))
-            , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( LightDown False, True ))
+            [ Html.Events.preventDefaultOn "pointerdown" (Decode.map (\e -> ( LightDown (Just e), True )) decodeMousePos)
+            , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( LightDown Nothing, True ))
             , Html.Attributes.style "touch-action" "none"
             ]
 
         mouseMoveListener =
-            Html.Events.preventDefaultOn "pointermove" (Decode.map (\e -> ( LightMoves e, True )) decodeMouseMove)
+            Html.Events.preventDefaultOn "pointermove" (Decode.map (\e -> ( LightMoves e, True )) decodeMousePos)
 
         allListeners =
-            if model.lightPointerDown then
-                mouseMoveListener :: commonListeners
+            case model.lightPointerDown of
+                Nothing ->
+                    commonListeners
 
-            else
-                commonListeners
+                Just _ ->
+                    mouseMoveListener :: commonListeners
     in
     Scene3d.sunny
         { camera = OrbitCamera.toCamera3d model.lightOrbitViewer.camera
