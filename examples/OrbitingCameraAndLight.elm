@@ -17,6 +17,7 @@ import Element.Background
 import Element.Border
 import Element.Events
 import Element.Font
+import Frame3d
 import Html
 import Html.Attributes
 import Html.Events
@@ -117,7 +118,7 @@ init () =
       , lightSphere =
             Scene3d.sphere
                 (Material.texturedMatte (Material.constant Color.white))
-                (Sphere3d.atOrigin (Length.meters 0.5))
+                (Sphere3d.atOrigin (Length.meters 0.35))
       , lightOrbitViewer =
             { size = ( Pixels.pixels 200, Pixels.pixels 200 )
             , camera = OrbitCamera.init Point3d.origin (Length.meters 2)
@@ -228,23 +229,39 @@ update message model =
 
         ( LightMoves ( dx, dy ), _ ) ->
             let
-                moveSpeed =
-                    Length.centimeters 5 |> Quantity.per Pixels.pixel
-
-                -- Project the movement vector into the viewing plane
-                viewPlane =
+                -- View frame moved to the origin to only account for rotations
+                viewFrameOrigin =
                     OrbitCamera.toCamera3d model.lightOrbitViewer.camera
                         |> Camera3d.viewpoint
                         |> Viewpoint3d.viewPlane
+                        |> SketchPlane3d.toFrame
+                        |> Frame3d.moveTo Point3d.origin
 
-                moveVector =
-                    Vector3d.xyOn viewPlane (dx |> Quantity.at moveSpeed |> Quantity.negate) (dy |> Quantity.at moveSpeed)
+                -- Rotation vector in the viewing plane
+                rotationVectorLocal =
+                    Vector3d.xyz dx (Quantity.negate dy) Quantity.zero
+                        |> Vector3d.rotateAround Axis3d.z (Angle.degrees 90)
 
-                -- Translate and re-normalize the light direction
+                -- Rotation axis in the local coordinates (with origin shifted to 0,0)
+                rotationAxisLocal =
+                    Axis3d.through
+                        Point3d.origin
+                        (Vector3d.direction rotationVectorLocal
+                            |> Maybe.withDefault Direction3d.y
+                        )
+
+                -- Rotation axis in world coordinates
+                rotationAxisGlobal =
+                    Axis3d.placeIn viewFrameOrigin rotationAxisLocal
+
+                -- Rotation magnitude
+                rotationMagnitude =
+                    Vector2d.length (Vector2d.xy dx dy)
+                        |> Quantity.at (Angle.degrees 1 |> Quantity.per Pixels.pixel)
+
+                -- Rotated light direction
                 updatedLightDirection =
-                    Vector3d.plus moveVector (Vector3d.withLength (Length.meters 1) model.lightDirection)
-                        |> Vector3d.direction
-                        |> Maybe.withDefault model.lightDirection
+                    Direction3d.rotateAround rotationAxisGlobal rotationMagnitude model.lightDirection
             in
             ( { model | lightDirection = updatedLightDirection }, Cmd.none )
 
