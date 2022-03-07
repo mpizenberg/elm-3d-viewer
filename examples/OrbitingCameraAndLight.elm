@@ -9,6 +9,7 @@ import Axis3d
 import Browser
 import Browser.Dom
 import Browser.Events
+import Camera3d
 import Color
 import Direction3d exposing (Direction3d)
 import Element exposing (Element)
@@ -37,6 +38,9 @@ import SketchPlane3d
 import Sphere3d
 import Task
 import TriangularMesh exposing (TriangularMesh)
+import Vector2d
+import Vector3d
+import Viewpoint3d
 
 
 main : Program () Model Msg
@@ -66,6 +70,8 @@ type Msg
     | MouseUp
     | KeyDown ModifierKey
     | KeyUp ModifierKey
+    | LightDown Bool
+    | LightMoves ( Quantity Float Pixels, Quantity Float Pixels )
     | ZoomIn ( Quantity Float Pixels, Quantity Float Pixels )
     | ZoomOut ( Quantity Float Pixels, Quantity Float Pixels )
 
@@ -93,6 +99,7 @@ type alias Model =
     , lightDirection : Direction3d ObjCoordinates
     , lightSphere : Scene3d.Entity ObjCoordinates
     , lightOrbitViewer : OrbitViewer Meters ObjCoordinates
+    , lightPointerDown : Bool
     }
 
 
@@ -105,13 +112,14 @@ init () =
             { size = ( Pixels.pixels 800, Pixels.pixels 400 )
             , camera = OrbitCamera.init Point3d.origin (Length.meters 5)
             }
+      , lightPointerDown = False
       , lightDirection = Direction3d.negativeZ
       , lightSphere =
             Scene3d.sphere
                 (Material.texturedMatte (Material.constant Color.white))
                 (Sphere3d.atOrigin (Length.meters 0.5))
       , lightOrbitViewer =
-            { size = ( Pixels.pixels 100, Pixels.pixels 100 )
+            { size = ( Pixels.pixels 200, Pixels.pixels 200 )
             , camera = OrbitCamera.init Point3d.origin (Length.meters 2)
             }
       }
@@ -218,6 +226,32 @@ update message model =
         ( MouseMove _, _ ) ->
             ( model, Cmd.none )
 
+        ( LightMoves ( dx, dy ), _ ) ->
+            let
+                moveSpeed =
+                    Length.centimeters 5 |> Quantity.per Pixels.pixel
+
+                -- Project the movement vector into the viewing plane
+                viewPlane =
+                    OrbitCamera.toCamera3d model.lightOrbitViewer.camera
+                        |> Camera3d.viewpoint
+                        |> Viewpoint3d.viewPlane
+
+                moveVector =
+                    Vector3d.xyOn viewPlane (dx |> Quantity.at moveSpeed |> Quantity.negate) (dy |> Quantity.at moveSpeed)
+
+                -- Translate and re-normalize the light direction
+                updatedLightDirection =
+                    Vector3d.plus moveVector (Vector3d.withLength (Length.meters 1) model.lightDirection)
+                        |> Vector3d.direction
+                        |> Maybe.withDefault model.lightDirection
+            in
+            ( { model | lightDirection = updatedLightDirection }, Cmd.none )
+
+        -- Record the current start/stop interaction with the light direction
+        ( LightDown lightPointerIsDown, _ ) ->
+            ( { model | lightPointerDown = lightPointerIsDown }, Cmd.none )
+
         -- Zooming in
         ( ZoomIn pos, _ ) ->
             -- ( { model | orbitViewer = OrbitViewer.zoomIn model.orbitViewer }, Cmd.none )
@@ -251,6 +285,16 @@ decodeMousePos =
     Decode.map2 Tuple.pair
         (Decode.field "clientX" (Decode.map Pixels.float Decode.float))
         (Decode.field "clientY" (Decode.map Pixels.float Decode.float))
+
+
+{-| Use movementX and movementY for simplicity (don't need to store initial
+mouse position in the model) - not supported in Internet Explorer though
+-}
+decodeMouseMove : Decoder ( Quantity Float Pixels, Quantity Float Pixels )
+decodeMouseMove =
+    Decode.map2 Tuple.pair
+        (Decode.field "movementX" (Decode.map Pixels.float Decode.float))
+        (Decode.field "movementY" (Decode.map Pixels.float Decode.float))
 
 
 keyDecoder : Decoder ModifierKey
@@ -385,24 +429,23 @@ viewElmUi model =
 
 viewLight : Model -> Element Msg
 viewLight model =
-    -- let
-    --     commonListeners =
-    --         [ Wheel.onWheel chooseZoom
-    --         , Html.Events.preventDefaultOn "pointerdown" (Decode.map (\e -> ( MouseDown e, True )) decodeMousePos)
-    --         , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( MouseUp, True ))
-    --         , Html.Attributes.style "touch-action" "none"
-    --         ]
-    --
-    --     mouseMoveListener =
-    --         Html.Events.preventDefaultOn "pointermove" (Decode.map (\e -> ( MouseMove e, True )) decodeMousePos)
-    --
-    --     allListeners =
-    --         if model.pointerState == PointerIdle then
-    --             commonListeners
-    --
-    --         else
-    --             mouseMoveListener :: commonListeners
-    -- in
+    let
+        commonListeners =
+            [ Html.Events.preventDefaultOn "pointerdown" (Decode.succeed ( LightDown True, True ))
+            , Html.Events.preventDefaultOn "pointerup" (Decode.succeed ( LightDown False, True ))
+            , Html.Attributes.style "touch-action" "none"
+            ]
+
+        mouseMoveListener =
+            Html.Events.preventDefaultOn "pointermove" (Decode.map (\e -> ( LightMoves e, True )) decodeMouseMove)
+
+        allListeners =
+            if model.lightPointerDown then
+                mouseMoveListener :: commonListeners
+
+            else
+                commonListeners
+    in
     Scene3d.sunny
         { camera = OrbitCamera.toCamera3d model.lightOrbitViewer.camera
         , shadows = False
@@ -415,7 +458,7 @@ viewLight model =
         -- Draw the 1m diameter sphere to show the light
         , entities = [ model.lightSphere ]
         }
-        -- |> List.singleton
-        -- |> Html.div allListeners
+        |> List.singleton
+        |> Html.div allListeners
         |> Element.html
         |> Element.el [ Element.alignRight, Element.alignBottom ]
