@@ -90,6 +90,19 @@ elevate angle camera =
     }
 
 
+{-| Defines a new orientation of the camera while keeping all other parameters untouched.
+-}
+setOrientation : { a | azimuth : Angle, elevation : Angle } -> OrbitCamera units coordinates -> OrbitCamera units coordinates
+setOrientation { azimuth, elevation } camera =
+    { focalPoint = camera.focalPoint
+    , groundPlane = camera.groundPlane
+    , azimuth = azimuth
+    , elevation = elevation
+    , distance = camera.distance
+    , projection = camera.projection
+    }
+
+
 
 -- TRANSLATIONS ######################################################
 

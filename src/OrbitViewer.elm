@@ -3,7 +3,7 @@ module OrbitViewer exposing (..)
 {-| A 3D viewer with helper functions for navigation control.
 -}
 
-import Angle exposing (Radians)
+import Angle exposing (Angle, Radians)
 import OrbitCamera exposing (OrbitCamera)
 import Pixels exposing (Pixels)
 import Quantity exposing (Quantity, Rate, Unitless)
@@ -66,6 +66,15 @@ orbit angularSpeed ( dx, dy ) { size, camera } =
     , camera =
         OrbitCamera.rotateAround (Quantity.negate dx |> Quantity.at angularSpeed) camera
             |> OrbitCamera.elevate (dy |> Quantity.at angularSpeed)
+    }
+
+
+{-| Defines a new orientation of the camera while keeping all other parameters untouched.
+-}
+setOrientation : { a | azimuth : Angle, elevation : Angle } -> OrbitViewer units coordinates -> OrbitViewer units coordinates
+setOrientation orientation { size, camera } =
+    { size = size
+    , camera = OrbitCamera.setOrientation orientation camera
     }
 
 
