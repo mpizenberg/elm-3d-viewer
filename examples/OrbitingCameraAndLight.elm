@@ -10,6 +10,7 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Color
+import Direction3d exposing (Direction3d)
 import Element exposing (Element)
 import Element.Background
 import Element.Border
@@ -89,6 +90,7 @@ type alias Model =
     , orbitViewer : OrbitViewer Meters ObjCoordinates
     , pointerState : PointerState
     , controller : Controller
+    , lightDirection : Direction3d ObjCoordinates
     , lightSphere : Scene3d.Entity ObjCoordinates
     , lightOrbitViewer : OrbitViewer Meters ObjCoordinates
     }
@@ -103,6 +105,7 @@ init () =
             { size = ( Pixels.pixels 800, Pixels.pixels 400 )
             , camera = OrbitCamera.init Point3d.origin (Length.meters 5)
             }
+      , lightDirection = Direction3d.negativeZ
       , lightSphere =
             Scene3d.sphere
                 (Material.texturedMatte (Material.constant Color.white))
@@ -358,8 +361,10 @@ viewElmUi model =
                 mouseMoveListener :: commonListeners
 
         scene3d =
-            Scene3d.cloudy
+            Scene3d.sunny
                 { camera = OrbitCamera.toCamera3d model.orbitViewer.camera
+                , shadows = False
+                , sunlightDirection = model.lightDirection
                 , upDirection = SketchPlane3d.normalDirection model.orbitViewer.camera.groundPlane
                 , clipDepth = Length.meters 0.01
                 , dimensions = Tuple.mapBoth Quantity.round Quantity.round model.orbitViewer.size
@@ -398,8 +403,10 @@ viewLight model =
     --         else
     --             mouseMoveListener :: commonListeners
     -- in
-    Scene3d.cloudy
+    Scene3d.sunny
         { camera = OrbitCamera.toCamera3d model.lightOrbitViewer.camera
+        , shadows = False
+        , sunlightDirection = model.lightDirection
         , upDirection = SketchPlane3d.normalDirection model.lightOrbitViewer.camera.groundPlane
         , clipDepth = Length.meters 0.01
         , dimensions = Tuple.mapBoth Quantity.round Quantity.round model.lightOrbitViewer.size
